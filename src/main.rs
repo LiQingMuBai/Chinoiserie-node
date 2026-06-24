@@ -96,23 +96,7 @@ async fn answer(
                 .unwrap_or_else(|_| "TQo2BpJ1hwjoa4ak8WmmrgwTHiHGp47777".to_owned());
 
             let text = format!(
-                "*一年节点费用：100 USDT（TRC20）*\n\
-\n\
-*1、充值*\n\
-请向以下地址充值：\n\
-`{address}`\n\
-\n\
-*2、提交交易哈希*\n\
-充值成功后，请将交易哈希（`TxHash`）发送给客服，或直接在机器人下方输入。\n\
-\n\
-*3、等待开通*\n\
-客服查阅确认后，将为你开通服务。\n\
-预计 *10 分钟*内节点搭建完毕，并会通知你。
-\n\
-*4、下载v2ray客户端*\n\
-下载链接：[点击这里](https://itlanyan.com/v2ray-clients-download/)\n\
-如以上链接无法下载，或需要其他客户端（Windows、iOS、Android、macOS），请联系我\n\
-"
+                ""
             );
 
             let qr_path = std::env::var("TOPUP_QR_PATH")

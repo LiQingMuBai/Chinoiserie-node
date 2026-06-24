@@ -1,6 +1,3 @@
-# telegram-bot
-
-基于 teloxide 的 Telegram 机器人 + MySQL 用户留存 + 推广返佣 + 广告群发。
 
 ## 功能
 
@@ -66,7 +63,7 @@ https://t.me/<bot_username>?start=<你的telegram_id>
 
 新用户通过该链接进入后，会触发 `/start <推广者id>`，并将推广者 id 写入 `telegram_users.referred_by_telegram_id`。
 
-## 广告群发（Bruno 布鲁诺节点）
+## 广告群发（Bruno）
 
 广告群发是一个单独的二进制入口：
 
