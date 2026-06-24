@@ -19,7 +19,7 @@ fn support_url() -> Option<reqwest::Url> {
 }
 
 fn ads_text_default() -> String {
-    "Bruno布鲁诺VPN节点\n稳定高速，支持多端使用。\n\n推广返佣 20%\n邀请好友开通即可获得返佣。\n\n点击机器人内 /referral 获取你的专属推广链接。".to_owned()
+    "".to_owned()
 }
 
 #[tokio::main]
