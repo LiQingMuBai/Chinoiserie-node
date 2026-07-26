@@ -120,11 +120,22 @@ async fn answer(
 
      match cmd {
         Command::Start(_payload) => {
-            let _address = std::env::var("TOPUP_ADDRESS")
-                .unwrap_or_else(|_| "TQo2BpJ1hwjoa4ak8WmmrgwTHiHGp47777".to_owned());
+            let address = std::env::var("TOPUP_ADDRESS")
+                .unwrap_or_else(|_| "TXkESNx5J3zjtWEtYE99JFRmMxf5rgUCCi".to_owned());
 
             let text = format!(
-                ""
+                "<b>一年节点费用：100 USDT（TRC20）</b>\n\n\
+<b>1、充值</b>\n\
+请向以下地址充值：\n\
+<code>{address}</code>\n\n\
+<b>2、提交交易哈希</b>\n\
+充值成功后，请将交易哈希（TxHash）发送给客服，或直接在机器人下方输入。\n\n\
+<b>3、等待开通</b>\n\
+客服查阅确认后，将为你开通服务。\n\
+预计 <b>10 分钟</b>内节点搭建完毕，并会通知你。\n\n\
+<b>4、下载v2ray客户端</b>\n\
+下载链接：<a href=\"https://itlanyan.com/v2ray-clients-download/\">点击这里</a>\n\
+如以上链接无法下载，或需要其他客户端（Windows、iOS、Android、macOS），请联系我"
             );
 
             let qr_path = std::env::var("TOPUP_QR_PATH")
@@ -134,14 +145,14 @@ async fn answer(
             match bot
                 .send_photo(chat_id, photo)
                 .caption(text.clone())
-                .parse_mode(ParseMode::MarkdownV2)
+                .parse_mode(ParseMode::Html)
                 .await
             {
                 Ok(_) => {}
                 Err(err) => {
                     log::error!("send_photo failed: {err}");
                     bot.send_message(chat_id, text)
-                        .parse_mode(ParseMode::MarkdownV2)
+                        .parse_mode(ParseMode::Html)
                         .await?;
                 }
             }
