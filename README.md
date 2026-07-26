@@ -7,6 +7,7 @@ A Telegram bot built with `teloxide`, featuring MySQL user persistence, referral
 - `/start`: Displays top-up instructions, TxHash submission flow, and client download link
 - `/help`: Shows support contact (configurable via environment variables)
 - `/referral`: Referral commission (20%), displays withdrawable commission amount (`amount`), generates a personal referral link, and includes a "Contact Support" inline button
+- Plain text transaction hashes: Stores the hash in MySQL and pushes it to the configured support chat
 - User persistence: Upserts the user into `telegram_users` on each command and updates `last_seen_at`
 - Referral attribution: When a user joins via a referral deep link (`/start <referrer_id>`), the new user's `referred_by_telegram_id` is filled once (it won't overwrite existing values)
 - Bulk ads sender: Reads `telegram_users.telegram_id` and sends a Bruno ads message to users with a configurable interval
@@ -22,8 +23,8 @@ Create a `.env` file (see `.env.example`).
 
 Core:
 
-- `TELOXIDE_TOKEN`: Telegram bot token
-- `DATABASE_URL`: MySQL connection string (database name must be `ming`)
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token
+- `MYSQL_DSN`: MySQL connection string (database name must be `ming`)
   - Example: `mysql://user:password@127.0.0.1:3306/ming`
 - `TOPUP_ADDRESS`: Top-up address (optional)
 - `TOPUP_QR_PATH`: QR image path (optional)
@@ -32,6 +33,7 @@ Support:
 
 - `SUPPORT_CONTACT`: Support username (with or without `@`)
 - `SUPPORT_CONTACT_URL`: Support URL (optional). If empty, it defaults to `https://t.me/{SUPPORT_CONTACT}`
+- `SUPPORT_CHAT_ID`: Numeric Telegram chat ID used by the bot to push new transaction hashes to support
 
 Bulk ads sender (only for `bruno_ads_main`):
 

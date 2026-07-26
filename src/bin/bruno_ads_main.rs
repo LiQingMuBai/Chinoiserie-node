@@ -18,8 +18,12 @@ fn support_url() -> Option<reqwest::Url> {
     url.parse().ok()
 }
 
+fn telegram_bot_token() -> Result<String, std::env::VarError> {
+    std::env::var("TELEGRAM_BOT_TOKEN")
+}
+
 fn ads_text_default() -> String {
-    "".to_owned()
+    "Bruno布鲁诺VPN节点\n稳定高速，支持多端使用。\n\n推广返佣 20%\n邀请好友开通即可获得返佣。\n\n点击机器人内 /referral 获取你的专属推广链接。".to_owned()
 }
 
 #[tokio::main]
@@ -38,7 +42,13 @@ async fn main() {
         }
     };
 
-    let bot = Bot::from_env();
+    let bot = match telegram_bot_token() {
+        Ok(token) => Bot::new(token),
+        Err(err) => {
+            log::error!("telegram bot token init failed: {err}");
+            return;
+        }
+    };
     let ids = match db::list_telegram_ids(&pool).await {
         Ok(ids) => ids,
         Err(err) => {

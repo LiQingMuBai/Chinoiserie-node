@@ -7,7 +7,7 @@ use teloxide::types::User;
 
 pub async fn create_pool_from_env(
 ) -> Result<MySqlPool, Box<dyn std::error::Error + Send + Sync>> {
-    let database_url = std::env::var("DATABASE_URL")?;
+    let database_url = std::env::var("MYSQL_DSN")?;
 
     let pool = MySqlPoolOptions::new()
         .acquire_timeout(Duration::from_secs(10))
@@ -60,6 +60,21 @@ CREATE TABLE IF NOT EXISTS telegram_users (
     sqlx::query(r#"ALTER TABLE telegram_users MODIFY COLUMN amount VARCHAR(64) NOT NULL DEFAULT ''"#)
         .execute(pool)
         .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS telegram_transaction_hashes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  telegram_id BIGINT UNSIGNED NOT NULL,
+  tx_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_telegram_transaction_hashes_telegram_id (telegram_id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+"#,
+    )
+    .execute(pool)
+    .await?;
 
     Ok(result)
 }
@@ -148,6 +163,27 @@ ORDER BY telegram_id
     .await?;
 
     Ok(ids)
+}
+
+pub async fn insert_transaction_hash(
+    pool: &MySqlPool,
+    telegram_id: u64,
+    tx_hash: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+INSERT INTO telegram_transaction_hashes
+  (telegram_id, tx_hash)
+VALUES
+  (?, ?)
+"#,
+    )
+    .bind(telegram_id)
+    .bind(tx_hash)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 fn normalize_amount(amount: Option<&str>) -> String {

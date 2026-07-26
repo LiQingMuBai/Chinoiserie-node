@@ -10,7 +10,7 @@ use telegram_bot::db;
 
 fn support_username() -> String {
     std::env::var("SUPPORT_CONTACT")
-        .unwrap_or_else(|_| "JoJotaroKujo".to_owned())
+        .unwrap_or_else(|_| "epinastinejojo_bot".to_owned())
         .trim()
         .trim_start_matches('@')
         .to_owned()
@@ -20,6 +20,16 @@ fn support_url_str() -> Option<String> {
     std::env::var("SUPPORT_CONTACT_URL")
         .ok()
         .or_else(|| Some(format!("https://t.me/{}", support_username())))
+}
+
+fn support_chat_id() -> Option<i64> {
+    std::env::var("SUPPORT_CHAT_ID")
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+}
+
+fn telegram_bot_token() -> Result<String, std::env::VarError> {
+    std::env::var("TELEGRAM_BOT_TOKEN")
 }
  
  #[derive(BotCommands, Clone)]
@@ -34,7 +44,7 @@ fn support_url_str() -> Option<String> {
  async fn main() {
      dotenvy::dotenv().ok();
     pretty_env_logger::formatted_builder()
-        .parse_env(Env::default().default_filter_or("trace"))
+        .parse_env(Env::default().default_filter_or("info"))
         .target(env_logger::Target::Stderr)
         .init();
  
@@ -46,7 +56,13 @@ fn support_url_str() -> Option<String> {
         }
     };
 
-     let bot = Bot::from_env();
+    let bot = match telegram_bot_token() {
+        Ok(token) => Bot::new(token),
+        Err(err) => {
+            log::error!("telegram bot token init failed: {err}");
+            return;
+        }
+    };
     let commands = vec![
         BotCommand::new("start", "开始"),
         BotCommand::new("help", "联系客服"),
@@ -56,9 +72,21 @@ fn support_url_str() -> Option<String> {
         log::error!("set_my_commands failed: {err}");
     }
 
-    let handler = Update::filter_message()
+    let command_handler = dptree::entry()
         .filter_command::<Command>()
         .endpoint(answer);
+    let tx_hash_handler = dptree::filter(|msg: Message| {
+        msg.text()
+            .map(|text| {
+                let text = text.trim();
+                !text.is_empty() && !text.starts_with('/')
+            })
+            .unwrap_or(false)
+    })
+    .endpoint(handle_transaction_hash);
+    let handler = Update::filter_message()
+        .branch(command_handler)
+        .branch(tx_hash_handler);
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![pool])
@@ -92,7 +120,7 @@ async fn answer(
 
      match cmd {
         Command::Start(_payload) => {
-            let address = std::env::var("TOPUP_ADDRESS")
+            let _address = std::env::var("TOPUP_ADDRESS")
                 .unwrap_or_else(|_| "TQo2BpJ1hwjoa4ak8WmmrgwTHiHGp47777".to_owned());
 
             let text = format!(
@@ -158,3 +186,60 @@ async fn answer(
      }
      Ok(())
  }
+
+async fn handle_transaction_hash(
+    bot: Bot,
+    msg: Message,
+    pool: sqlx::MySqlPool,
+) -> ResponseResult<()> {
+    let chat_id = msg.chat.id;
+    let Some(user) = msg.from() else {
+        bot.send_message(chat_id, "无法识别发送者信息，请稍后重试。").await?;
+        return Ok(());
+    };
+    let Some(tx_hash) = msg.text().map(str::trim).filter(|text| !text.is_empty()) else {
+        return Ok(());
+    };
+
+    if let Err(err) = db::upsert_telegram_user(&pool, user, None).await {
+        log::error!("upsert user failed: {err}");
+    }
+
+    if let Err(err) = db::insert_transaction_hash(&pool, user.id.0, tx_hash).await {
+        log::error!("insert transaction hash failed: {err}");
+        bot.send_message(chat_id, "交易哈希保存失败，请稍后重试。").await?;
+        return Ok(());
+    }
+
+    let mut notified_support = false;
+    if let Some(support_id) = support_chat_id() {
+        let username = user
+            .username
+            .as_deref()
+            .map(|value| format!("@{value}"))
+            .unwrap_or_else(|| "-".to_owned());
+        let notify_text = format!(
+            "收到新的交易哈希\ntelegram_id: {}\nusername: {}\nname: {}\ntx_hash: {}",
+            user.id.0,
+            username,
+            user.full_name(),
+            tx_hash
+        );
+
+        match bot.send_message(ChatId(support_id), notify_text).await {
+            Ok(_) => notified_support = true,
+            Err(err) => log::error!("notify support failed: {err}"),
+        }
+    } else {
+        log::warn!("SUPPORT_CHAT_ID is not configured, skip support notification");
+    }
+
+    let reply = if notified_support {
+        "已收到你的交易哈希，并已推送给客服。"
+    } else {
+        "已收到你的交易哈希，客服推送暂未配置，请稍后联系客服确认。"
+    };
+    bot.send_message(chat_id, reply).await?;
+
+    Ok(())
+}
