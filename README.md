@@ -29,6 +29,7 @@ Core:
   - Example: `mysql://user:password@127.0.0.1:3306/ming`
 - `TOPUP_ADDRESS`: Top-up address (optional)
 - `TOPUP_QR_PATH`: QR image path (optional)
+The bot will automatically cache the QR image `file_id` in MySQL after the first successful upload, so subsequent `/start` calls are faster.
 
 Support:
 

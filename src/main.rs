@@ -241,15 +241,42 @@ async fn answer(
 
             let qr_path = std::env::var("TOPUP_QR_PATH")
                 .unwrap_or_else(|_| format!("{}/7777.png", env!("CARGO_MANIFEST_DIR")));
-            let photo = InputFile::file(qr_path);
+            let cached_file_id = match db::get_kv(&pool, "topup_qr_file_id").await {
+                Ok(value) => value,
+                Err(err) => {
+                    log::error!("get kv failed: {err}");
+                    None
+                }
+            };
+
+            if let Some(file_id) = cached_file_id {
+                let send_by_id = bot
+                    .send_photo(chat_id, InputFile::file_id(file_id))
+                    .caption(text.clone())
+                    .parse_mode(ParseMode::Html)
+                    .await;
+                if send_by_id.is_ok() {
+                    return Ok(());
+                }
+            }
 
             match bot
-                .send_photo(chat_id, photo)
+                .send_photo(chat_id, InputFile::file(qr_path))
                 .caption(text.clone())
                 .parse_mode(ParseMode::Html)
                 .await
             {
-                Ok(_) => {}
+                Ok(sent) => {
+                    if let Some(id) = sent
+                        .photo()
+                        .and_then(|sizes| sizes.last())
+                        .map(|p| p.file.id.clone())
+                    {
+                        if let Err(err) = db::set_kv(&pool, "topup_qr_file_id", &id).await {
+                            log::error!("set kv failed: {err}");
+                        }
+                    }
+                }
                 Err(err) => {
                     log::error!("send_photo failed: {err}");
                     bot.send_message(chat_id, text)

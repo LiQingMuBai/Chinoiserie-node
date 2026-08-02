@@ -93,6 +93,20 @@ CREATE TABLE IF NOT EXISTS telegram_transaction_hashes (
     .execute(pool)
     .await?;
 
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS telegram_kv (
+  k VARCHAR(128) NOT NULL,
+  v VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (k)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+"#,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(result)
 }
 
@@ -235,6 +249,40 @@ VALUES
     )
     .bind(telegram_id)
     .bind(tx_hash)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_kv(pool: &MySqlPool, key: &str) -> Result<Option<String>, sqlx::Error> {
+    let value: Option<Option<String>> = sqlx::query_scalar::<_, Option<String>>(
+        r#"
+SELECT v
+FROM telegram_kv
+WHERE k = ?
+"#,
+    )
+    .bind(key)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(value.flatten().map(|v| v.trim().to_owned()).filter(|v| !v.is_empty()))
+}
+
+pub async fn set_kv(pool: &MySqlPool, key: &str, value: &str) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+INSERT INTO telegram_kv
+  (k, v)
+VALUES
+  (?, ?) AS new
+ON DUPLICATE KEY UPDATE
+  v = new.v
+"#,
+    )
+    .bind(key)
+    .bind(value)
     .execute(pool)
     .await?;
 
