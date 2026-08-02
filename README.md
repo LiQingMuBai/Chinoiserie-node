@@ -7,6 +7,7 @@ A Telegram bot built with `teloxide`, featuring MySQL user persistence, referral
 - `/start`: Displays top-up instructions, TxHash submission flow, and client download link
 - `/help`: Shows support contact (configurable via environment variables)
 - `/referral`: Referral commission (20%), displays withdrawable commission amount (`amount`), generates a personal referral link, and includes a "Contact Support" inline button
+- `/lang`: Sets the UI language preference (`/lang zh` or `/lang en`)
 - Plain text transaction hashes: Stores the hash in MySQL and pushes it to the configured support chat
 - User persistence: Upserts the user into `telegram_users` on each command and updates `last_seen_at`
 - Referral attribution: When a user joins via a referral deep link (`/start <referrer_id>`), the new user's `referred_by_telegram_id` is filled once (it won't overwrite existing values)
@@ -50,6 +51,7 @@ On startup, the app will create/patch the schema automatically.
 - Columns:
   - `telegram_id` BIGINT UNSIGNED (PK)
   - `username` / `first_name` / `last_name` / `language_code` / `is_bot`
+  - `preferred_lang` VARCHAR(8) NOT NULL DEFAULT '' (takes precedence over Telegram `language_code` when set)
   - `referred_by_telegram_id` BIGINT UNSIGNED NULL
   - `amount` VARCHAR(64) NOT NULL DEFAULT '' (displayed as `0.0 USDT` when empty/blank/0)
   - `created_at` / `last_seen_at`

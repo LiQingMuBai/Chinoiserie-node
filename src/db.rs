@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS telegram_users (
   first_name VARCHAR(255) NOT NULL,
   last_name VARCHAR(255) NULL,
   language_code VARCHAR(32) NULL,
+  preferred_lang VARCHAR(8) NOT NULL DEFAULT '',
   is_bot BOOLEAN NOT NULL,
   referred_by_telegram_id BIGINT UNSIGNED NULL,
   amount VARCHAR(64) NOT NULL DEFAULT '',
@@ -53,6 +54,12 @@ CREATE TABLE IF NOT EXISTS telegram_users (
     )
     .await?;
 
+    ensure_column(
+        pool,
+        r#"ALTER TABLE telegram_users ADD COLUMN preferred_lang VARCHAR(8) NOT NULL DEFAULT ''"#,
+    )
+    .await?;
+
     sqlx::query(r#"UPDATE telegram_users SET amount = '' WHERE amount IS NULL"#)
         .execute(pool)
         .await?;
@@ -60,6 +67,16 @@ CREATE TABLE IF NOT EXISTS telegram_users (
     sqlx::query(r#"ALTER TABLE telegram_users MODIFY COLUMN amount VARCHAR(64) NOT NULL DEFAULT ''"#)
         .execute(pool)
         .await?;
+
+    sqlx::query(r#"UPDATE telegram_users SET preferred_lang = '' WHERE preferred_lang IS NULL"#)
+        .execute(pool)
+        .await?;
+
+    sqlx::query(
+        r#"ALTER TABLE telegram_users MODIFY COLUMN preferred_lang VARCHAR(8) NOT NULL DEFAULT ''"#,
+    )
+    .execute(pool)
+    .await?;
 
     sqlx::query(
         r#"
@@ -118,7 +135,7 @@ ON DUPLICATE KEY UPDATE
   last_name = new.last_name,
   language_code = new.language_code,
   is_bot = new.is_bot,
-  referred_by_telegram_id = COALESCE(referred_by_telegram_id, new.referred_by_telegram_id),
+  referred_by_telegram_id = COALESCE(telegram_users.referred_by_telegram_id, new.referred_by_telegram_id),
   last_seen_at = CURRENT_TIMESTAMP
 "#,
     )
@@ -163,6 +180,44 @@ ORDER BY telegram_id
     .await?;
 
     Ok(ids)
+}
+
+pub async fn get_user_preferred_lang(
+    pool: &MySqlPool,
+    telegram_id: u64,
+) -> Result<Option<String>, sqlx::Error> {
+    let value: Option<Option<String>> = sqlx::query_scalar::<_, Option<String>>(
+        r#"
+SELECT preferred_lang
+FROM telegram_users
+WHERE telegram_id = ?
+"#,
+    )
+    .bind(telegram_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(value.flatten().map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()))
+}
+
+pub async fn set_user_preferred_lang(
+    pool: &MySqlPool,
+    telegram_id: u64,
+    preferred_lang: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+UPDATE telegram_users
+SET preferred_lang = ?
+WHERE telegram_id = ?
+"#,
+    )
+    .bind(preferred_lang)
+    .bind(telegram_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 pub async fn insert_transaction_hash(
