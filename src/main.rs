@@ -149,7 +149,7 @@ fn contact_support_button_text(lang: Lang) -> String {
     Start(String),
      Help,
     Referral,
-    Lang(String),
+    Lang,
  }
  
  #[tokio::main]
@@ -179,7 +179,7 @@ fn contact_support_button_text(lang: Lang) -> String {
         BotCommand::new("start", "开始"),
         BotCommand::new("help", "联系客服"),
         BotCommand::new("referral", "推广返佣"),
-        BotCommand::new("lang", "语言/Language"),
+        BotCommand::new("lang", "切换语言/Toggle language"),
     ];
     if let Err(err) = bot.set_my_commands(commands).await {
         log::error!("set_my_commands failed: {err}");
@@ -305,23 +305,13 @@ async fn answer(
                     .await?;
             }
         }
-        Command::Lang(value) => {
+        Command::Lang => {
             let Some(user) = msg.from() else {
                 return Ok(());
             };
-            let v = value.trim().to_lowercase();
-            let target = if v.starts_with("zh") {
-                Some((Lang::Zh, "zh"))
-            } else if v.starts_with("en") {
-                Some((Lang::En, "en"))
-            } else {
-                None
-            };
-
-            let Some((target_lang, stored)) = target else {
-                bot.send_message(chat_id, "用法：/lang zh 或 /lang en\nUsage: /lang zh or /lang en")
-                    .await?;
-                return Ok(());
+            let (target_lang, stored) = match lang {
+                Lang::Zh => (Lang::En, "en"),
+                Lang::En => (Lang::Zh, "zh"),
             };
 
             if let Err(err) = db::set_user_preferred_lang(&pool, user.id.0, stored).await {
